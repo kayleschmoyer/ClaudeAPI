@@ -26,8 +26,11 @@ export interface VOLProductPayload {
     loadRange: string;
     wallCode: string;
     uniformTireQualityGrading: string;
-    manufacturerWarrantyMiles: string;
-    tireTread: string;
+    manufacturerWarrantyMiles: number | null;
+    tireTread: number | null;
+    msRated: boolean;
+    passengerAndLightTruck: null;
+    discontinued: null;
   };
   pricing: {
     publishedCost: number;
@@ -49,11 +52,19 @@ export interface VOLProductPayload {
     showPart: boolean;
     showPrice: boolean;
   };
-  warrantyInfo: any;
-  wheel: any;
-  batteries: any;
-  chains: any;
-  commodityCodes: any;
+  warrantyInfo: object;
+  wheel: object;
+  batteries: object;
+  chains: object;
+  commodityCodes: object;
+}
+
+function parseNumber(value: string | undefined): number | null {
+  if (!value || value.trim() === '') {
+    return null;
+  }
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? null : parsed;
 }
 
 export function mapCSVRowToVOLProduct(row: CSVRow): VOLProductPayload {
@@ -88,12 +99,15 @@ export function mapCSVRowToVOLProduct(row: CSVRow): VOLProductPayload {
       loadRange: row['Load Range'] || '',
       wallCode: row.Sidewall || '',
       uniformTireQualityGrading: row.UTQG || '',
-      manufacturerWarrantyMiles: row.Warranty || '',
-      tireTread: row['Tread Depth'] || ''
+      manufacturerWarrantyMiles: parseNumber(row.Warranty),
+      tireTread: parseNumber(row['Tread Depth']),
+      msRated: false,
+      passengerAndLightTruck: null,
+      discontinued: null
     },
     pricing: {
       publishedCost: 0,
-      listPrice: parseFloat(row.Price || '0'),
+      listPrice: parseNumber(row.Price) || 0,
       laborAmount: 0,
       productAddon: 0,
       laborAddon: 0,
@@ -111,10 +125,10 @@ export function mapCSVRowToVOLProduct(row: CSVRow): VOLProductPayload {
       showPart: true,
       showPrice: true
     },
-    warrantyInfo: null,
-    wheel: null,
-    batteries: null,
-    chains: null,
-    commodityCodes: null
+    warrantyInfo: {},
+    wheel: {},
+    batteries: {},
+    chains: {},
+    commodityCodes: {}
   };
 }

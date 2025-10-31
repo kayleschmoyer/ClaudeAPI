@@ -33,7 +33,10 @@ function App() {
 
   const handleBulkImport = async (rows: CSVRow[]) => {
     try {
-      const result = await sendBulkImport(rows);
+      const token = config.auth?.bearer?.token || '';
+      const url = config.url;
+
+      const result = await sendBulkImport(rows, url, token);
       if (result.results) {
         setBulkResults(prev => [...prev, ...result.results]);
       }

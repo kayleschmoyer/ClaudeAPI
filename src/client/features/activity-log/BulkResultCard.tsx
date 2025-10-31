@@ -96,7 +96,7 @@ export const BulkResultCard: React.FC<BulkResultCardProps> = ({ result }) => {
           </Badge>
         </div>
         <span style={timestampStyle}>
-          {new Date().toLocaleTimeString()}
+          {new Date(result.timestamp).toLocaleTimeString()}
         </span>
       </div>
 
