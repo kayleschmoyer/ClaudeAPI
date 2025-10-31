@@ -77,6 +77,7 @@ export interface BulkImportResult {
   statusText: string;
   requestBody: any;
   responseBody: any;
+  timestamp: string;
 }
 
 export interface BulkImportResponse {

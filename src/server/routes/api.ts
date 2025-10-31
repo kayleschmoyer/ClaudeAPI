@@ -3,7 +3,7 @@ import { RequestConfig, ApiResponse, CSVRow, BulkImportResult } from '../../shar
 import { dispatchRequest } from '../services/http/requestDispatcher.js';
 import { mapCSVRowToVOLProduct } from '../services/csvMapper.js';
 import axios from 'axios';
-import { buildHeaders } from '../utils/headerBuilder.js';
+import { buildVolHeaders } from '../utils/headerBuilder.js';
 
 const router = Router();
 
@@ -51,7 +51,7 @@ router.post('/sendRequest', async (req: Request, res: Response) => {
 
 router.post('/bulkImport', async (req: Request, res: Response) => {
   try {
-    const { rows } = req.body as { rows: CSVRow[] };
+    const { rows, url, token } = req.body as { rows: CSVRow[], url: string, token: string };
 
     if (!rows || !Array.isArray(rows)) {
       return res.status(400).json({
@@ -59,7 +59,20 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
       });
     }
 
+    if (!url) {
+      return res.status(400).json({
+        error: 'Invalid request: url is required'
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        error: 'Invalid request: token is required'
+      });
+    }
+
     const results: BulkImportResult[] = [];
+    const headers = buildVolHeaders(token);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -70,11 +83,8 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
 
         const response = await axios({
           method: 'POST',
-          url: 'https://api.vol.ca/products',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer YOUR_TOKEN_HERE'
-          },
+          url: url,
+          headers: headers,
           data: productPayload,
           validateStatus: () => true
         });
@@ -84,7 +94,8 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
           httpStatusCode: response.status,
           statusText: response.status >= 200 && response.status < 300 ? 'Created' : 'Failed',
           requestBody: productPayload,
-          responseBody: response.data
+          responseBody: response.data,
+          timestamp: new Date().toISOString()
         });
       } catch (error: any) {
         results.push({
@@ -94,7 +105,8 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
           requestBody: mapCSVRowToVOLProduct(row),
           responseBody: {
             error: error.message || 'Request failed'
-          }
+          },
+          timestamp: new Date().toISOString()
         });
       }
     }

@@ -16,13 +16,13 @@ export async function sendRequest(config: RequestConfig): Promise<ApiResponse> {
   return response.json();
 }
 
-export async function sendBulkImport(rows: CSVRow[]): Promise<BulkImportResponse> {
+export async function sendBulkImport(rows: CSVRow[], url: string, token: string): Promise<BulkImportResponse> {
   const response = await fetch('/api/bulkImport', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ rows })
+    body: JSON.stringify({ rows, url, token })
   });
 
   if (!response.ok) {
