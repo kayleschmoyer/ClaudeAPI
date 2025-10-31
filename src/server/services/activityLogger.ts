@@ -22,7 +22,7 @@ function createActivity(
 
 export function logRequestStart(
   requestId: string,
-  config: RequestConfig
+  _config: RequestConfig
 ): ActivityEntry {
   return createActivity(
     requestId,

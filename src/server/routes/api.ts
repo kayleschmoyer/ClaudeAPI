@@ -1,78 +1,88 @@
 import { Router, Request, Response } from 'express';
-import { RequestConfig, ApiResponse, CSVRow, BulkImportResult } from '../../shared/types/index.js';
-import { dispatchRequest } from '../services/http/requestDispatcher.js';
-import { mapCSVRowToVOLProduct } from '../services/csvMapper.js';
 import axios from 'axios';
 import { buildVolHeaders } from '../utils/headerBuilder.js';
+import { mapCSVRowToVOLProduct } from '../services/csvMapper.js';
 
 const router = Router();
 
 router.post('/sendRequest', async (req: Request, res: Response) => {
   try {
-    const config: RequestConfig = req.body;
+    const { baseUrl, token, body } = req.body;
 
-    if (!config.url) {
+    if (!baseUrl) {
       return res.status(400).json({
-        success: false,
-        error: 'URL is required',
-        activities: []
-      });
-    }
-
-    if (!config.method) {
-      return res.status(400).json({
-        success: false,
-        error: 'HTTP method is required',
-        activities: []
-      });
-    }
-
-    const result = await dispatchRequest(config);
-
-    const response: ApiResponse = {
-      success: true,
-      data: result.data,
-      activities: result.activities
-    };
-
-    res.json(response);
-  } catch (error: any) {
-    console.error('Request failed:', error);
-
-    const response: ApiResponse = {
-      success: false,
-      error: error.message || 'Request failed',
-      activities: []
-    };
-
-    res.status(500).json(response);
-  }
-});
-
-router.post('/bulkImport', async (req: Request, res: Response) => {
-  try {
-    const { rows, url, token } = req.body as { rows: CSVRow[], url: string, token: string };
-
-    if (!rows || !Array.isArray(rows)) {
-      return res.status(400).json({
-        error: 'Invalid request: rows array is required'
-      });
-    }
-
-    if (!url) {
-      return res.status(400).json({
-        error: 'Invalid request: url is required'
+        error: 'baseUrl is required'
       });
     }
 
     if (!token) {
       return res.status(400).json({
-        error: 'Invalid request: token is required'
+        error: 'token is required'
       });
     }
 
-    const results: BulkImportResult[] = [];
+    if (!body) {
+      return res.status(400).json({
+        error: 'body is required'
+      });
+    }
+
     const headers = buildVolHeaders(token);
+    const url = `${baseUrl}/products/products?api-version=3.0`;
+
+    const response = await axios({
+      method: 'POST',
+      url: url,
+      headers: headers,
+      data: body,
+      validateStatus: () => true
+    });
+
+    res.json({
+      httpStatusCode: response.status,
+      requestBody: body,
+      responseBody: response.data
+    });
+  } catch (error: any) {
+    console.error('Request failed:', error);
+    res.status(500).json({
+      httpStatusCode: 500,
+      requestBody: req.body.body || {},
+      responseBody: {
+        error: error.message || 'Request failed'
+      }
+    });
+  }
+});
+
+router.post('/bulkImport', async (req: Request, res: Response) => {
+  try {
+    const { baseUrl, token, rows } = req.body;
+
+    if (!baseUrl) {
+      return res.status(400).json({
+        error: 'baseUrl is required'
+      });
+    }
+
+    if (!token) {
+      return res.status(400).json({
+        error: 'token is required'
+      });
+    }
+
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({
+        error: 'rows array is required'
+      });
+    }
+
+    const headers = buildVolHeaders(token);
+    const url = `${baseUrl}/products/products?api-version=3.0`;
+
+    const logEntries: any[] = [];
+    let succeeded = 0;
+    let failed = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -89,29 +99,75 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
           validateStatus: () => true
         });
 
-        results.push({
+        const isSuccess = response.status >= 200 && response.status < 300;
+
+        if (isSuccess) {
+          succeeded++;
+        } else {
+          failed++;
+        }
+
+        const logEntry: any = {
           rowNumber,
           httpStatusCode: response.status,
-          statusText: response.status >= 200 && response.status < 300 ? 'Created' : 'Failed',
+          status: isSuccess ? 'Created' : 'Failed',
           requestBody: productPayload,
           responseBody: response.data,
           timestamp: new Date().toISOString()
-        });
+        };
+
+        if (productPayload.productNumber) {
+          logEntry.productNumber = productPayload.productNumber;
+        }
+
+        if (!isSuccess) {
+          if (response.data?.title) {
+            logEntry.message = response.data.title;
+          }
+          if (response.data?.errors) {
+            logEntry.details = Object.values(response.data.errors).flat();
+          }
+        }
+
+        logEntries.push(logEntry);
       } catch (error: any) {
-        results.push({
+        failed++;
+
+        const productPayload = mapCSVRowToVOLProduct(row);
+
+        logEntries.push({
           rowNumber,
           httpStatusCode: 500,
-          statusText: 'Failed',
-          requestBody: mapCSVRowToVOLProduct(row),
+          status: 'Failed',
+          requestBody: productPayload,
           responseBody: {
             error: error.message || 'Request failed'
           },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          message: error.message || 'Request failed',
+          productNumber: productPayload.productNumber
         });
       }
     }
 
-    res.json({ results });
+    const summary = {
+      totalRows: rows.length,
+      succeeded,
+      failed,
+      results: logEntries.map(entry => ({
+        rowNumber: entry.rowNumber,
+        status: entry.status,
+        httpCode: entry.httpStatusCode,
+        productNumber: entry.productNumber,
+        message: entry.message,
+        details: entry.details
+      }))
+    };
+
+    res.json({
+      summary,
+      logEntries
+    });
   } catch (error: any) {
     console.error('Bulk import failed:', error);
     res.status(500).json({

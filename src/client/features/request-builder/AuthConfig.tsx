@@ -1,5 +1,5 @@
 import React from 'react';
-import { AuthConfig as AuthConfigType, AuthType, HeaderEntry } from '../../../shared/types';
+import { AuthConfig as AuthConfigType, AuthType } from '../../../shared/types';
 import { Select } from '../../components/Select';
 import { Input } from '../../components/Input';
 import { theme } from '../../styles/theme';
