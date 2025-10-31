@@ -40,7 +40,8 @@ function App() {
   const [responseSummary, setResponseSummary] = useState<ResultSummary | any>(null);
   const [activityLog, setActivityLog] = useState<ActivityCard[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const parseCSV = (text: string): any[] => {
     const lines = text.trim().split('\n');
@@ -87,8 +88,36 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const extractMessageFromResponse = (responseBody: any): string | undefined => {
+    if (!responseBody) return undefined;
+
+    // Extract from title field
+    if (responseBody.title) {
+      return responseBody.title;
+    }
+
+    // Extract from ValidationRuleExceptions if present
+    if (responseBody.ValidationRuleExceptions && Array.isArray(responseBody.ValidationRuleExceptions)) {
+      const firstException = responseBody.ValidationRuleExceptions[0];
+      if (firstException?.Message) {
+        return firstException.Message;
+      }
+    }
+
+    return undefined;
+  };
+
   const handleSend = async () => {
-    setLoading(true);
+    // Reset state before each run
+    setResponseSummary({
+      totalRows: 0,
+      succeeded: 0,
+      failed: 0,
+      results: []
+    });
+    setActivityLog([]);
+    setIsSending(true);
+    setProgress(0);
 
     try {
       if (mode === 'manual') {
@@ -104,9 +133,12 @@ function App() {
 
         const result = await response.json();
 
+        const extractedMessage = extractMessageFromResponse(result.responseBody);
+
         setResponseSummary({
           httpStatusCode: result.httpStatusCode,
-          responseBody: result.responseBody
+          responseBody: result.responseBody,
+          message: extractedMessage
         });
 
         const card: ActivityCard = {
@@ -115,11 +147,16 @@ function App() {
           status: result.httpStatusCode >= 200 && result.httpStatusCode < 300 ? 'Created' : 'Failed',
           httpCode: result.httpStatusCode,
           requestBody: result.requestBody,
-          responseBody: result.responseBody
+          responseBody: result.responseBody,
+          message: extractedMessage
         };
 
-        setActivityLog(prev => [...prev, card]);
+        setActivityLog([card]);
+        setProgress(100);
       } else {
+        const totalRows = csvRows.length;
+        let processedRows = 0;
+
         const response = await fetch('/api/bulkImport', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -132,35 +169,67 @@ function App() {
 
         const result = await response.json();
 
-        setResponseSummary(result.summary);
+        // Extract messages from each response
+        const enhancedResults = result.summary.results.map((res: any, idx: number) => {
+          const logEntry = result.logEntries[idx];
+          const message = res.message || extractMessageFromResponse(logEntry?.responseBody);
 
-        const cards: ActivityCard[] = result.logEntries.map((entry: any) => ({
-          timestamp: entry.timestamp,
-          mode: `Row #${entry.rowNumber}`,
-          status: entry.status,
-          httpCode: entry.httpStatusCode,
-          requestBody: entry.requestBody,
-          responseBody: entry.responseBody,
-          productNumber: entry.productNumber,
-          message: entry.message,
-          details: entry.details
-        }));
+          return {
+            ...res,
+            message
+          };
+        });
 
-        setActivityLog(prev => [...prev, ...cards]);
+        const enhancedSummary = {
+          ...result.summary,
+          results: enhancedResults
+        };
+
+        setResponseSummary(enhancedSummary);
+
+        const cards: ActivityCard[] = result.logEntries.map((entry: any, idx: number) => {
+          const message = entry.message || extractMessageFromResponse(entry.responseBody);
+
+          return {
+            timestamp: entry.timestamp,
+            mode: `Row #${entry.rowNumber}`,
+            status: entry.status,
+            httpCode: entry.httpStatusCode,
+            requestBody: entry.requestBody,
+            responseBody: entry.responseBody,
+            productNumber: entry.productNumber,
+            message: message,
+            details: entry.details
+          };
+        });
+
+        setActivityLog(cards);
+        setProgress(100);
       }
     } catch (error: any) {
       console.error('Request failed:', error);
+      setProgress(0);
     } finally {
-      setLoading(false);
+      setIsSending(false);
     }
   };
 
+  const handleClearLog = () => {
+    setActivityLog([]);
+    setResponseSummary({
+      totalRows: 0,
+      succeeded: 0,
+      failed: 0,
+      results: []
+    });
+  };
+
   const filteredLog = filterMode === 'errors'
-    ? activityLog.filter(card => card.status === 'Failed')
+    ? activityLog.filter(card => card.httpCode >= 400 || card.status === 'Failed')
     : activityLog;
 
   const downloadFullLog = () => {
-    downloadJSON(filteredLog, 'activity-log.json');
+    downloadJSON(activityLog, 'activity-log.json');
   };
 
   const downloadResultsSummary = () => {
@@ -169,12 +238,22 @@ function App() {
     }
   };
 
+  const getButtonLabel = () => {
+    if (!isSending) {
+      return mode === 'manual' ? 'Send Request' : 'Send All';
+    }
+    if (mode === 'csv') {
+      return `Importing… (${Math.round(progress)}%)`;
+    }
+    return 'Sending…';
+  };
+
   return (
     <div style={{
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      background: COLORS.WHITE,
+      background: COLORS.BISCUIT,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       <header style={{
@@ -410,7 +489,7 @@ function App() {
 
             <button
               onClick={handleSend}
-              disabled={loading || !baseUrl || !token || (mode === 'csv' && csvRows.length === 0)}
+              disabled={isSending || !baseUrl || !token || (mode === 'csv' && csvRows.length === 0)}
               style={{
                 marginTop: '16px',
                 width: '100%',
@@ -421,12 +500,45 @@ function App() {
                 borderRadius: '4px',
                 fontSize: '16px',
                 fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1
+                cursor: isSending ? 'not-allowed' : 'pointer',
+                opacity: (isSending || !baseUrl || !token || (mode === 'csv' && csvRows.length === 0)) ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
               }}
             >
-              {loading ? 'Sending...' : mode === 'manual' ? 'Send Request' : 'Send All'}
+              {isSending && (
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  border: `2px solid ${COLORS.WHITE}`,
+                  borderTop: `2px solid transparent`,
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }} />
+              )}
+              {getButtonLabel()}
             </button>
+
+            {isSending && (
+              <div style={{
+                marginTop: '8px',
+                width: '100%',
+                height: '4px',
+                background: COLORS.BISCUIT,
+                borderRadius: '2px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${progress}%`,
+                  background: COLORS.KLIPBOARD_MAGENTA,
+                  borderRadius: '2px',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            )}
           </section>
         </div>
 
@@ -436,7 +548,8 @@ function App() {
           borderRadius: '8px',
           padding: '20px',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          maxHeight: '70vh'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2 style={{
@@ -500,7 +613,8 @@ function App() {
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',
-            height: '100%'
+            height: '100%',
+            maxHeight: '70vh'
           }}>
             <div style={{
               display: 'flex',
@@ -516,22 +630,40 @@ function App() {
               }}>
                 Activity / Results Log
               </h2>
-              <button
-                onClick={downloadFullLog}
-                disabled={filteredLog.length === 0}
-                style={{
-                  padding: '6px 12px',
-                  background: COLORS.CHARCOAL,
-                  color: COLORS.WHITE,
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  cursor: filteredLog.length > 0 ? 'pointer' : 'not-allowed',
-                  opacity: filteredLog.length > 0 ? 1 : 0.5
-                }}
-              >
-                Download Full Log
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handleClearLog}
+                  disabled={activityLog.length === 0}
+                  style={{
+                    padding: '6px 12px',
+                    background: COLORS.CHARCOAL,
+                    color: COLORS.WHITE,
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: activityLog.length > 0 ? 'pointer' : 'not-allowed',
+                    opacity: activityLog.length > 0 ? 1 : 0.5
+                  }}
+                >
+                  Clear Log
+                </button>
+                <button
+                  onClick={downloadFullLog}
+                  disabled={activityLog.length === 0}
+                  style={{
+                    padding: '6px 12px',
+                    background: COLORS.CHARCOAL,
+                    color: COLORS.WHITE,
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: activityLog.length > 0 ? 'pointer' : 'not-allowed',
+                    opacity: activityLog.length > 0 ? 1 : 0.5
+                  }}
+                >
+                  Download Full Log
+                </button>
+              </div>
             </div>
 
             <div style={{ marginBottom: '12px' }}>
@@ -568,7 +700,7 @@ function App() {
                   color: '#999',
                   fontStyle: 'italic'
                 }}>
-                  No activity yet
+                  {filterMode === 'errors' ? 'No errors in log' : 'No activity yet'}
                 </div>
               ) : (
                 filteredLog.map((card, idx) => (
@@ -598,7 +730,7 @@ function App() {
                         borderRadius: '4px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        background: card.status === 'Created' ? COLORS.KLIPBOARD_MAGENTA : COLORS.WHITE,
+                        background: card.status === 'Created' ? COLORS.KLIPBOARD_MAGENTA : COLORS.BISCUIT,
                         color: card.status === 'Created' ? COLORS.WHITE : COLORS.CHARCOAL,
                         border: card.status === 'Created' ? 'none' : `1px solid ${COLORS.CHARCOAL}`
                       }}>
@@ -619,7 +751,10 @@ function App() {
                       <div style={{
                         fontSize: '11px',
                         color: '#D32F2F',
-                        marginBottom: '8px'
+                        marginBottom: '8px',
+                        padding: '6px',
+                        background: '#FFEBEE',
+                        borderRadius: '4px'
                       }}>
                         {card.message}
                       </div>
@@ -629,7 +764,10 @@ function App() {
                       <div style={{
                         fontSize: '11px',
                         color: '#D32F2F',
-                        marginBottom: '8px'
+                        marginBottom: '8px',
+                        padding: '6px',
+                        background: '#FFEBEE',
+                        borderRadius: '4px'
                       }}>
                         {card.details.map((d, i) => <div key={i}>• {d}</div>)}
                       </div>
@@ -693,6 +831,11 @@ function App() {
       </main>
 
       <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
           height: 8px;
