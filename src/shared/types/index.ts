@@ -52,3 +52,33 @@ export interface ApiResponse {
   activities: ActivityEntry[];
   error?: string;
 }
+
+export interface CSVRow {
+  Source?: string;
+  'IPCCode/Part #'?: string;
+  ItemName?: string;
+  Make?: string;
+  Width?: string;
+  Profile?: string;
+  Rim?: string;
+  LoadIndex?: string;
+  SpeedRating?: string;
+  'Load Range'?: string;
+  Sidewall?: string;
+  UTQG?: string;
+  Warranty?: string;
+  'Tread Depth'?: string;
+  Price?: string;
+}
+
+export interface BulkImportResult {
+  rowNumber: number;
+  httpStatusCode: number;
+  statusText: string;
+  requestBody: any;
+  responseBody: any;
+}
+
+export interface BulkImportResponse {
+  results: BulkImportResult[];
+}

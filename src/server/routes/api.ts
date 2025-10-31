@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { RequestConfig, ApiResponse } from '../../shared/types/index.js';
+import { RequestConfig, ApiResponse, CSVRow, BulkImportResult } from '../../shared/types/index.js';
 import { dispatchRequest } from '../services/http/requestDispatcher.js';
+import { mapCSVRowToVOLProduct } from '../services/csvMapper.js';
+import axios from 'axios';
+import { buildHeaders } from '../utils/headerBuilder.js';
 
 const router = Router();
 
@@ -43,6 +46,65 @@ router.post('/sendRequest', async (req: Request, res: Response) => {
     };
 
     res.status(500).json(response);
+  }
+});
+
+router.post('/bulkImport', async (req: Request, res: Response) => {
+  try {
+    const { rows } = req.body as { rows: CSVRow[] };
+
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({
+        error: 'Invalid request: rows array is required'
+      });
+    }
+
+    const results: BulkImportResult[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 1;
+
+      try {
+        const productPayload = mapCSVRowToVOLProduct(row);
+
+        const response = await axios({
+          method: 'POST',
+          url: 'https://api.vol.ca/products',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer YOUR_TOKEN_HERE'
+          },
+          data: productPayload,
+          validateStatus: () => true
+        });
+
+        results.push({
+          rowNumber,
+          httpStatusCode: response.status,
+          statusText: response.status >= 200 && response.status < 300 ? 'Created' : 'Failed',
+          requestBody: productPayload,
+          responseBody: response.data
+        });
+      } catch (error: any) {
+        results.push({
+          rowNumber,
+          httpStatusCode: 500,
+          statusText: 'Failed',
+          requestBody: mapCSVRowToVOLProduct(row),
+          responseBody: {
+            error: error.message || 'Request failed'
+          }
+        });
+      }
+    }
+
+    res.json({ results });
+  } catch (error: any) {
+    console.error('Bulk import failed:', error);
+    res.status(500).json({
+      error: error.message || 'Bulk import failed'
+    });
   }
 });
 

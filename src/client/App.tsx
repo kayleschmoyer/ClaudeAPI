@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RequestBuilder } from './features/request-builder/RequestBuilder';
 import { ResponseViewer } from './features/response-viewer/ResponseViewer';
 import { ActivityLog } from './features/activity-log/ActivityLog';
+import { BulkImport } from './features/bulk-import/BulkImport';
 import { useRequestState } from './hooks/useRequestState';
 import { useActivityLog } from './hooks/useActivityLog';
-import { sendRequest } from './services/apiClient';
+import { sendRequest, sendBulkImport } from './services/apiClient';
 import { theme } from './styles/theme';
+import { CSVRow, BulkImportResult } from '../shared/types';
 
 function App() {
   const { config, setConfig, response, setResponse, loading, setLoading } = useRequestState();
   const { activities, addActivities } = useActivityLog();
+  const [bulkResults, setBulkResults] = useState<BulkImportResult[]>([]);
 
   const handleSend = async () => {
     setLoading(true);
@@ -25,6 +28,17 @@ function App() {
       console.error('Request failed:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBulkImport = async (rows: CSVRow[]) => {
+    try {
+      const result = await sendBulkImport(rows);
+      if (result.results) {
+        setBulkResults(prev => [...prev, ...result.results]);
+      }
+    } catch (error: any) {
+      console.error('Bulk import failed:', error);
     }
   };
 
@@ -54,6 +68,7 @@ function App() {
   const columnStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
+    gap: theme.spacing.lg,
     height: '100%',
     overflow: 'hidden'
   };
@@ -71,12 +86,13 @@ function App() {
             onSend={handleSend}
             loading={loading}
           />
+          <BulkImport onImport={handleBulkImport} />
         </div>
         <div style={columnStyle}>
           <ResponseViewer response={response} />
         </div>
         <div style={columnStyle}>
-          <ActivityLog activities={activities} />
+          <ActivityLog activities={activities} bulkResults={bulkResults} />
         </div>
       </main>
     </div>
