@@ -1,5 +1,3 @@
-import { CSVRow } from '../../shared/types/index.js';
-
 export interface VOLProductPayload {
   branchId: string;
   accountCodeId: string;
@@ -26,11 +24,11 @@ export interface VOLProductPayload {
     loadRange: string;
     wallCode: string;
     uniformTireQualityGrading: string;
-    manufacturerWarrantyMiles: number | null;
-    tireTread: number | null;
+    manufacturerWarrantyMiles: number;
+    tireTread: number;
     msRated: boolean;
-    passengerAndLightTruck: null;
-    discontinued: null;
+    passengerAndLightTruck: string;
+    discontinued: string;
   };
   pricing: {
     publishedCost: number;
@@ -59,26 +57,30 @@ export interface VOLProductPayload {
   commodityCodes: object;
 }
 
-function parseNumber(value: string | undefined): number | null {
+function parseNumber(value: string | undefined): number {
   if (!value || value.trim() === '') {
-    return null;
+    return 0;
   }
   const parsed = parseFloat(value);
-  return isNaN(parsed) ? null : parsed;
+  return isNaN(parsed) ? 0 : parsed;
 }
 
-export function mapCSVRowToVOLProduct(row: CSVRow): VOLProductPayload {
-  const width = row.Width || '';
-  const profile = row.Profile || '';
-  const rim = row.Rim || '';
+function sanitizeString(value: string | undefined): string {
+  return value?.trim() || '';
+}
+
+export function mapCSVRowToVOLProduct(row: any): VOLProductPayload {
+  const width = sanitizeString(row.Width);
+  const profile = sanitizeString(row.Profile);
+  const rim = sanitizeString(row.Rim);
   const catalogSize = `${width}${profile}${rim}`;
 
   return {
-    branchId: row.Source || '',
+    branchId: sanitizeString(row.Source),
     accountCodeId: '0520000',
     salesClassId: '052',
-    productNumber: row['IPCCode/Part #'] || '',
-    description: row.ItemName || '',
+    productNumber: sanitizeString(row['IPCCode/Part #']),
+    description: sanitizeString(row.ItemName),
     productTypeId: 1,
     tire: true,
     includeInTireQuoteScreen: true,
@@ -87,27 +89,27 @@ export function mapCSVRowToVOLProduct(row: CSVRow): VOLProductPayload {
     inventoriable: true,
     isQuickAdd: true,
     tyreGroupForTax: 1,
-    manufacturerId: row.Make || '',
+    manufacturerId: sanitizeString(row.Make),
     tireDetails: {
       catalogSize,
       searchSize: catalogSize,
       tireWidth: width,
       tireRatio: profile,
       tireRim: rim,
-      loadIndex: row.LoadIndex || '',
-      rate: row.SpeedRating || '',
-      loadRange: row['Load Range'] || '',
-      wallCode: row.Sidewall || '',
-      uniformTireQualityGrading: row.UTQG || '',
+      loadIndex: sanitizeString(row.LoadIndex),
+      rate: sanitizeString(row.SpeedRating),
+      loadRange: sanitizeString(row['Load Range']),
+      wallCode: sanitizeString(row.Sidewall),
+      uniformTireQualityGrading: sanitizeString(row.UTQG),
       manufacturerWarrantyMiles: parseNumber(row.Warranty),
       tireTread: parseNumber(row['Tread Depth']),
       msRated: false,
-      passengerAndLightTruck: null,
-      discontinued: null
+      passengerAndLightTruck: '',
+      discontinued: ''
     },
     pricing: {
       publishedCost: 0,
-      listPrice: parseNumber(row.Price) || 0,
+      listPrice: parseNumber(row.Price),
       laborAmount: 0,
       productAddon: 0,
       laborAddon: 0,
