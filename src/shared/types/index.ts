@@ -83,3 +83,22 @@ export interface BulkImportResult {
 export interface BulkImportResponse {
   results: BulkImportResult[];
 }
+
+// Inventory Adjustment Types
+export interface InventoryCSVRow {
+  Source?: string;
+  Make?: string;
+  'IPCCode/Part #'?: string;
+  Stock?: string;
+}
+
+export interface InventoryAdjustmentLine {
+  productId: string;
+  quantity: number;
+  reasonId: string;
+}
+
+export interface InventoryAdjustmentPayload {
+  branchId: string;
+  adjustmentLines: InventoryAdjustmentLine[];
+}

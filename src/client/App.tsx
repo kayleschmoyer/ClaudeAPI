@@ -29,8 +29,10 @@ interface ResultSummary {
 
 type InputMode = 'manual' | 'csv';
 type FilterMode = 'all' | 'errors';
+type ApiType = 'products' | 'inventory';
 
 function App() {
+  const [apiType, setApiType] = useState<ApiType>('products');
   const [baseUrl, setBaseUrl] = useState('');
   const [token, setToken] = useState('');
   const [mode, setMode] = useState<InputMode>('manual');
@@ -121,14 +123,18 @@ function App() {
 
     try {
       if (mode === 'manual') {
-        const response = await fetch('/api/sendRequest', {
+        const endpoint = apiType === 'products'
+          ? '/api/sendRequest'
+          : '/api/inventory/sendInventoryAdjustment';
+
+        const requestBody = apiType === 'products'
+          ? { baseUrl, token, body: JSON.parse(manualBody) }
+          : { url: baseUrl, token, body: JSON.parse(manualBody) };
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl,
-            token,
-            body: JSON.parse(manualBody)
-          })
+          body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
@@ -154,17 +160,18 @@ function App() {
         setActivityLog([card]);
         setProgress(100);
       } else {
-        const totalRows = csvRows.length;
-        let processedRows = 0;
+        const endpoint = apiType === 'products'
+          ? '/api/bulkImport'
+          : '/api/inventory/bulkInventoryAdjustment';
 
-        const response = await fetch('/api/bulkImport', {
+        const requestBody = apiType === 'products'
+          ? { baseUrl, token, rows: csvRows }
+          : { url: baseUrl, token, rows: csvRows };
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl,
-            token,
-            rows: csvRows
-          })
+          body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
@@ -187,12 +194,14 @@ function App() {
 
         setResponseSummary(enhancedSummary);
 
-        const cards: ActivityCard[] = result.logEntries.map((entry: any, idx: number) => {
+        const cards: ActivityCard[] = result.logEntries.map((entry: any) => {
           const message = entry.message || extractMessageFromResponse(entry.responseBody);
 
           return {
             timestamp: entry.timestamp,
-            mode: `Row #${entry.rowNumber}`,
+            mode: apiType === 'products'
+              ? `Row #${entry.rowNumber}`
+              : `Payload #${entry.payloadNumber} (Branch: ${entry.branchId})`,
             status: entry.status,
             httpCode: entry.httpStatusCode,
             requestBody: entry.requestBody,
@@ -308,13 +317,57 @@ function App() {
                 fontSize: '14px',
                 fontWeight: 500
               }}>
-                API Base URL
+                API Type
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="radio"
+                    name="apiType"
+                    value="products"
+                    checked={apiType === 'products'}
+                    onChange={() => setApiType('products')}
+                  />
+                  <span style={{ color: COLORS.CHARCOAL, fontSize: '14px' }}>Products API</span>
+                </label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="radio"
+                    name="apiType"
+                    value="inventory"
+                    checked={apiType === 'inventory'}
+                    onChange={() => setApiType('inventory')}
+                  />
+                  <span style={{ color: COLORS.CHARCOAL, fontSize: '14px' }}>Inventory Adjustment API</span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                color: COLORS.CHARCOAL,
+                fontSize: '14px',
+                fontWeight: 500
+              }}>
+                {apiType === 'products' ? 'API Base URL' : 'API URL'}
               </label>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.example.com"
+                placeholder={apiType === 'products' ? 'https://api.example.com' : 'https://services2.vol.mamscloud.com/inventory/Stock/adjustment?api-version=1.0'}
                 style={{
                   width: '100%',
                   padding: '10px',
@@ -462,6 +515,23 @@ function App() {
                 }}>
                   Upload CSV File
                 </label>
+
+                <div style={{
+                  background: COLORS.BISCUIT,
+                  padding: '10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  color: COLORS.CHARCOAL,
+                  marginBottom: '12px'
+                }}>
+                  <strong>Expected CSV Columns:</strong>
+                  <div style={{ marginTop: '4px', fontFamily: 'monospace' }}>
+                    {apiType === 'products'
+                      ? 'Source, IPCCode/Part #, ItemName, Make, Width, Profile, Rim, LoadIndex, SpeedRating, Load Range, Sidewall, UTQG, Warranty, Tread Depth, Price'
+                      : 'Source, Make, IPCCode/Part #, Stock'}
+                  </div>
+                </div>
+
                 <input
                   type="file"
                   accept=".csv"
