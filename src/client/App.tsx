@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { COLORS } from '../shared/constants/colors';
+import klipboardLogo from './assets/klipboard-logo-main.png';
 
 interface ActivityCard {
   timestamp: string;
@@ -273,14 +274,28 @@ function App() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h1 style={{
-          margin: 0,
-          color: COLORS.CHARCOAL,
-          fontSize: '28px',
-          fontWeight: 700
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
         }}>
-          API Console - Request Builder
-        </h1>
+          <img
+            src={klipboardLogo}
+            alt="Klipboard Logo"
+            style={{
+              height: '40px',
+              width: 'auto'
+            }}
+          />
+          <h1 style={{
+            margin: 0,
+            color: COLORS.CHARCOAL,
+            fontSize: '28px',
+            fontWeight: 700
+          }}>
+            API Console - Request Builder
+          </h1>
+        </div>
         <div style={{
           fontSize: '12px',
           color: '#666',
