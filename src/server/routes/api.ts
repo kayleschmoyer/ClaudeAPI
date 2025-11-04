@@ -7,11 +7,11 @@ const router = Router();
 
 router.post('/sendRequest', async (req: Request, res: Response) => {
   try {
-    const { baseUrl, token, body } = req.body;
+    const { url, token, body } = req.body;
 
-    if (!baseUrl) {
+    if (!url) {
       return res.status(400).json({
-        error: 'baseUrl is required'
+        error: 'url is required'
       });
     }
 
@@ -28,7 +28,6 @@ router.post('/sendRequest', async (req: Request, res: Response) => {
     }
 
     const headers = buildVolHeaders(token);
-    const url = `${baseUrl}/products/products?api-version=3.0`;
 
     const response = await axios({
       method: 'POST',
@@ -57,11 +56,11 @@ router.post('/sendRequest', async (req: Request, res: Response) => {
 
 router.post('/bulkImport', async (req: Request, res: Response) => {
   try {
-    const { baseUrl, token, rows } = req.body;
+    const { url, token, rows } = req.body;
 
-    if (!baseUrl) {
+    if (!url) {
       return res.status(400).json({
-        error: 'baseUrl is required'
+        error: 'url is required'
       });
     }
 
@@ -78,7 +77,6 @@ router.post('/bulkImport', async (req: Request, res: Response) => {
     }
 
     const headers = buildVolHeaders(token);
-    const url = `${baseUrl}/products/products?api-version=3.0`;
 
     const logEntries: any[] = [];
     let succeeded = 0;

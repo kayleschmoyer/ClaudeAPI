@@ -128,7 +128,7 @@ function App() {
           : '/api/inventory/sendInventoryAdjustment';
 
         const requestBody = apiType === 'products'
-          ? { baseUrl, token, body: JSON.parse(manualBody) }
+          ? { url: baseUrl, token, body: JSON.parse(manualBody) }
           : { url: baseUrl, token, body: JSON.parse(manualBody) };
 
         const response = await fetch(endpoint, {
@@ -165,7 +165,7 @@ function App() {
           : '/api/inventory/bulkInventoryAdjustment';
 
         const requestBody = apiType === 'products'
-          ? { baseUrl, token, rows: csvRows }
+          ? { url: baseUrl, token, rows: csvRows }
           : { url: baseUrl, token, rows: csvRows };
 
         const response = await fetch(endpoint, {
@@ -268,7 +268,10 @@ function App() {
       <header style={{
         background: COLORS.BISCUIT,
         padding: '24px',
-        borderBottom: `2px solid ${COLORS.CHARCOAL}`
+        borderBottom: `2px solid ${COLORS.CHARCOAL}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <h1 style={{
           margin: 0,
@@ -278,6 +281,17 @@ function App() {
         }}>
           API Console - Request Builder
         </h1>
+        <div style={{
+          fontSize: '12px',
+          color: '#666',
+          fontFamily: 'monospace',
+          padding: '4px 8px',
+          background: 'rgba(0,0,0,0.05)',
+          borderRadius: '4px',
+          fontWeight: 500
+        }}>
+          {apiType === 'products' ? 'POST' : 'PUT'}
+        </div>
       </header>
 
       <main style={{
@@ -361,13 +375,13 @@ function App() {
                 fontSize: '14px',
                 fontWeight: 500
               }}>
-                {apiType === 'products' ? 'API Base URL' : 'API URL'}
+                API URL
               </label>
               <input
                 type="text"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={apiType === 'products' ? 'https://api.example.com' : 'https://services2.vol.mamscloud.com/inventory/Stock/adjustment?api-version=1.0'}
+                placeholder={apiType === 'products' ? 'https://services2.vol.mamscloud.com/products/products?api-version=3.0' : 'https://services2.vol.mamscloud.com/inventory/Stock/adjustment?api-version=1.0'}
                 style={{
                   width: '100%',
                   padding: '10px',
