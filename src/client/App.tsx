@@ -312,8 +312,29 @@ function App() {
             background: COLORS.WHITE,
             border: `1px solid ${COLORS.CHARCOAL}`,
             borderRadius: '8px',
-            padding: '20px'
+            padding: '20px',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Ribbon Badge */}
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              right: '-32px',
+              transform: 'rotate(45deg)',
+              background: COLORS.KLIPBOARD_MAGENTA,
+              color: COLORS.WHITE,
+              padding: '6px 40px',
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              textAlign: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 10
+            }}>
+              {apiType === 'products' ? 'POST' : 'PUT'}
+            </div>
+
             <h2 style={{
               margin: '0 0 16px 0',
               color: COLORS.CHARCOAL,
