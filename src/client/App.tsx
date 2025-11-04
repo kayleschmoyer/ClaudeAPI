@@ -274,39 +274,22 @@ function App() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
+        <h1 style={{
+          margin: 0,
+          color: COLORS.CHARCOAL,
+          fontSize: '28px',
+          fontWeight: 700
         }}>
-          <img
-            src={klipboardLogo}
-            alt="Klipboard Logo"
-            style={{
-              height: '40px',
-              width: 'auto'
-            }}
-          />
-          <h1 style={{
-            margin: 0,
-            color: COLORS.CHARCOAL,
-            fontSize: '28px',
-            fontWeight: 700
-          }}>
-            API Console - Request Builder
-          </h1>
-        </div>
-        <div style={{
-          fontSize: '12px',
-          color: '#666',
-          fontFamily: 'monospace',
-          padding: '4px 8px',
-          background: 'rgba(0,0,0,0.05)',
-          borderRadius: '4px',
-          fontWeight: 500
-        }}>
-          {apiType === 'products' ? 'POST' : 'PUT'}
-        </div>
+          API Console - Request Builder
+        </h1>
+        <img
+          src={klipboardLogo}
+          alt="Klipboard Logo"
+          style={{
+            height: '40px',
+            width: 'auto'
+          }}
+        />
       </header>
 
       <main style={{
